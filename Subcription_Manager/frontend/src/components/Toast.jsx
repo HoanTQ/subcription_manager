@@ -1,96 +1,108 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircleIcon, XCircleIcon, XIcon } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
-const Toast = ({ message, type = 'success', duration = 5000, onClose }) => {
-  const [isVisible, setIsVisible] = useState(true);
-  const [isAnimating, setIsAnimating] = useState(false);
-
+/**
+ * Toast notification component với thiết kế hiện đại
+ * Hỗ trợ các loại: success, error, warning, info
+ */
+const Toast = ({ message, type = 'info', onClose, duration = 5000 }) => {
   useEffect(() => {
-    setIsAnimating(true);
-    
-    // Auto close for success messages
-    if (type === 'success' && duration > 0) {
+    if (type !== 'error' && duration > 0) {
       const timer = setTimeout(() => {
-        handleClose();
+        onClose();
       }, duration);
-      
       return () => clearTimeout(timer);
     }
-  }, [type, duration]);
+  }, [duration, onClose, type]);
 
-  const handleClose = () => {
-    setIsAnimating(false);
-    setTimeout(() => {
-      setIsVisible(false);
-      if (onClose) onClose();
-    }, 300);
-  };
-
-  if (!isVisible) return null;
-
-  const getToastStyles = () => {
-    const baseStyles = "fixed top-4 right-4 z-50 max-w-md w-full bg-white rounded-lg shadow-lg border-l-4 p-4 transition-all duration-300 transform";
-    
-    if (type === 'success') {
-      return `${baseStyles} border-green-500 ${isAnimating ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`;
-    } else {
-      return `${baseStyles} border-red-500 ${isAnimating ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`;
+  const config = {
+    success: {
+      icon: CheckCircle,
+      bgColor: 'bg-emerald-50',
+      borderColor: 'border-emerald-200',
+      iconColor: 'text-emerald-500',
+      textColor: 'text-emerald-800',
+      progressColor: 'bg-emerald-500'
+    },
+    error: {
+      icon: XCircle,
+      bgColor: 'bg-rose-50',
+      borderColor: 'border-rose-200',
+      iconColor: 'text-rose-500',
+      textColor: 'text-rose-800',
+      progressColor: 'bg-rose-500'
+    },
+    warning: {
+      icon: AlertTriangle,
+      bgColor: 'bg-amber-50',
+      borderColor: 'border-amber-200',
+      iconColor: 'text-amber-500',
+      textColor: 'text-amber-800',
+      progressColor: 'bg-amber-500'
+    },
+    info: {
+      icon: Info,
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      iconColor: 'text-blue-500',
+      textColor: 'text-blue-800',
+      progressColor: 'bg-blue-500'
     }
   };
 
-  const getIcon = () => {
-    if (type === 'success') {
-      return <CheckCircleIcon className="w-6 h-6 text-green-500" />;
-    } else {
-      return <XCircleIcon className="w-6 h-6 text-red-500" />;
-    }
-  };
-
-  const getTextColor = () => {
-    return type === 'success' ? 'text-green-800' : 'text-red-800';
-  };
+  const { icon: Icon, bgColor, borderColor, iconColor, textColor, progressColor } = config[type] || config.info;
 
   return (
-    <div className={getToastStyles()}>
-      <div className="flex items-start">
-        <div className="flex-shrink-0">
-          {getIcon()}
-        </div>
-        <div className="ml-3 flex-1">
-          <div className={`text-sm font-medium ${getTextColor()}`}>
-            {message}
-          </div>
-        </div>
-        <div className="ml-4 flex-shrink-0">
-          <button
-            onClick={handleClose}
-            className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-              type === 'success' 
-                ? 'text-green-400 hover:bg-green-100 focus:ring-green-600' 
-                : 'text-red-400 hover:bg-red-100 focus:ring-red-600'
-            }`}
-          >
-            <XIcon className="w-4 h-4" />
-          </button>
-        </div>
+    <div className={`
+      fixed top-4 right-4 z-50 max-w-sm w-full
+      ${bgColor} ${borderColor} border rounded-xl shadow-lg
+      animate-in slide-in-from-right duration-300
+      overflow-hidden
+    `}>
+      <div className="p-4 flex items-start gap-3">
+        <Icon className={`w-5 h-5 ${iconColor} flex-shrink-0 mt-0.5`} />
+        <p className={`flex-1 text-sm font-medium ${textColor}`}>{message}</p>
+        <button
+          onClick={onClose}
+          className={`${textColor} hover:opacity-70 transition-opacity flex-shrink-0`}
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
-    </div>
-  );
-};
-
-// Toast Container Component
-export const ToastContainer = ({ toasts, removeToast }) => {
-  return (
-    <div className="fixed top-0 right-0 z-50 p-4 space-y-4">
-      {toasts.map((toast) => (
-        <Toast
-          key={toast.id}
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration}
-          onClose={() => removeToast(toast.id)}
-        />
-      ))}
+      
+      {/* Progress bar for auto-dismiss */}
+      {type !== 'error' && duration > 0 && (
+        <div className="h-1 w-full bg-black/5">
+          <div 
+            className={`h-full ${progressColor} animate-shrink`}
+            style={{ 
+              animation: `shrink ${duration}ms linear forwards`
+            }}
+          />
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes shrink {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+        
+        @keyframes slide-in-from-right {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        .animate-in {
+          animation: slide-in-from-right 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
