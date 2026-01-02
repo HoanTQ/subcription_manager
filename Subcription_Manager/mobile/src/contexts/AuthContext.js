@@ -2,8 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-// Thay đổi URL này thành IP của máy tính chạy backend
-const API_BASE_URL = 'http://10.94.13.38:3001'; // IP của máy tính này
+// Production API URL (Cloud Run)
+const API_BASE_URL = __DEV__ 
+  ? 'http://10.94.13.38:3001'  // Local development
+  : 'https://subscription-backend-huvta3w7yq-as.a.run.app'; // Production
 
 const AuthContext = createContext();
 
