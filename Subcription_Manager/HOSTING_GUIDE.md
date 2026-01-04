@@ -182,7 +182,7 @@ gcloud app deploy
 cd mobile
 
 # Install EAS CLI
-npm install -g @expo/eas-cli
+npm install --global eas-cli
 
 # Login and configure
 eas login
@@ -200,7 +200,7 @@ eas submit --platform all
 // mobile/src/contexts/AuthContext.js
 const API_BASE_URL = __DEV__ 
   ? 'http://10.94.13.38:3001'
-  : 'https://subscription-backend-xxx-as.a.run.app';
+  : 'https://subscription-backend-huvta3w7yq-as.a.run.app';
 ```
 
 ## 🔧 Setup Script

@@ -6,23 +6,24 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Alert
+  Alert,
+  StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import ServiceIcon from '../components/ServiceIcon';
+import { colors, gradients, shadows, spacing, borderRadius, typography } from '../theme';
 
 export default function DashboardScreen({ navigation }) {
   const [summary, setSummary] = useState(null);
   const [upcoming, setUpcoming] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const { logout, user } = useAuth();
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -30,332 +31,243 @@ export default function DashboardScreen({ navigation }) {
         axios.get('/api/v1/dashboard/summary'),
         axios.get('/api/v1/dashboard/upcoming?days=7')
       ]);
-
-      if (summaryRes.data.success) {
-        setSummary(summaryRes.data.data);
-      }
-
-      if (upcomingRes.data.success) {
-        setUpcoming(upcomingRes.data.data);
-      }
+      if (summaryRes.data.success) setSummary(summaryRes.data.data);
+      if (upcomingRes.data.success) setUpcoming(upcomingRes.data.data);
     } catch (err) {
-      Alert.alert('Lỗi', 'Không thể tải dữ liệu dashboard');
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchDashboardData();
-  };
+  const onRefresh = () => { setRefreshing(true); fetchDashboardData(); };
 
   const formatCurrency = (amount, currency = 'VND') => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: currency
-    }).format(amount);
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency }).format(amount);
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc muốn đăng xuất?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Đăng xuất', onPress: logout }
-      ]
-    );
+    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Đăng xuất', onPress: logout, style: 'destructive' }
+    ]);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Đang tải...</Text>
+        <View style={styles.loadingCard} />
+        <View style={styles.loadingCard} />
       </View>
     );
   }
 
+  const stats = [
+    { label: 'Subscriptions', value: summary?.summary?.totalActiveSubscriptions || 0, icon: 'card', gradient: gradients.primary },
+    { label: 'Tháng này', value: formatCurrency(summary?.summary?.monthlyTotal || 0), icon: 'trending-up', gradient: ['#10b981', '#059669'] },
+    { label: '30 ngày tới', value: formatCurrency(summary?.summary?.next30DaysTotal || 0), icon: 'calendar', gradient: ['#f59e0b', '#d97706'] },
+    { label: 'Sắp đến hạn', value: (upcoming?.dueSoon?.length || 0) + (upcoming?.overdue?.length || 0), icon: 'alert-circle', gradient: ['#f43f5e', '#e11d48'] },
+  ];
+
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Xin chào!</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+      <LinearGradient colors={gradients.primary} style={styles.header}>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Xin chào! 👋</Text>
+            <Text style={styles.userEmail}>{user?.email?.split('@')[0]}</Text>
+          </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={22} color="rgba(255,255,255,0.9)" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#ef4444" />
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
-      {/* Summary Cards */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: '#dbeafe' }]}>
-            <Ionicons name="card-outline" size={24} color="#2563eb" />
-            <Text style={styles.summaryNumber}>
-              {summary?.summary?.totalActiveSubscriptions || 0}
-            </Text>
-            <Text style={styles.summaryLabel}>Subscriptions</Text>
-          </View>
-
-          <View style={[styles.summaryCard, { backgroundColor: '#dcfce7' }]}>
-            <Ionicons name="cash-outline" size={24} color="#16a34a" />
-            <Text style={styles.summaryNumber}>
-              {formatCurrency(summary?.summary?.monthlyTotal || 0)}
-            </Text>
-            <Text style={styles.summaryLabel}>Tháng này</Text>
-          </View>
-        </View>
-
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: '#fef3c7' }]}>
-            <Ionicons name="calendar-outline" size={24} color="#d97706" />
-            <Text style={styles.summaryNumber}>
-              {formatCurrency(summary?.summary?.next30DaysTotal || 0)}
-            </Text>
-            <Text style={styles.summaryLabel}>30 ngày tới</Text>
-          </View>
-
-          <View style={[styles.summaryCard, { backgroundColor: '#fecaca' }]}>
-            <Ionicons name="alert-circle-outline" size={24} color="#dc2626" />
-            <Text style={styles.summaryNumber}>
-              {(upcoming?.dueSoon?.length || 0) + (upcoming?.overdue?.length || 0)}
-            </Text>
-            <Text style={styles.summaryLabel}>Sắp đến hạn</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Top Subscriptions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Subscriptions</Text>
-        {summary?.topSubscriptions?.length > 0 ? (
-          summary.topSubscriptions.slice(0, 5).map((sub, index) => (
-            <View key={index} style={styles.subscriptionItem}>
-              <View style={styles.subscriptionInfo}>
-                <Text style={styles.subscriptionName}>{sub.serviceName}</Text>
-                <Text style={styles.subscriptionCycle}>{sub.cycle}</Text>
-              </View>
-              <Text style={styles.subscriptionAmount}>
-                {formatCurrency(sub.amount, sub.currency)}
-              </Text>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[500]} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {stats.map((stat, index) => (
+            <View key={index} style={styles.statCard}>
+              <LinearGradient colors={stat.gradient} style={styles.statIcon}>
+                <Ionicons name={stat.icon} size={18} color="#fff" />
+              </LinearGradient>
+              <Text style={styles.statValue} numberOfLines={1}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Chưa có subscription nào</Text>
-        )}
-      </View>
+          ))}
+        </View>
 
-      {/* Upcoming Dues */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sắp đến hạn (7 ngày)</Text>
-        
-        {upcoming?.overdue?.length > 0 && (
-          <View>
-            <Text style={styles.subsectionTitle}>Quá hạn</Text>
-            {upcoming.overdue.map((sub) => (
-              <View key={sub.subscriptionId} style={[styles.upcomingItem, styles.overdueItem]}>
-                <View style={styles.upcomingInfo}>
-                  <Text style={styles.upcomingName}>{sub.serviceName}</Text>
-                  <Text style={styles.overdueText}>
-                    Quá hạn {Math.abs(sub.daysUntilDue)} ngày
-                  </Text>
-                </View>
-                <Text style={styles.upcomingAmount}>
-                  {formatCurrency(sub.amount, sub.currency)}
-                </Text>
-              </View>
-            ))}
+        {/* Top Subscriptions */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top Subscriptions</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Subscriptions')}>
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
+            </TouchableOpacity>
           </View>
-        )}
-
-        {upcoming?.dueSoon?.length > 0 && (
-          <View>
-            <Text style={styles.subsectionTitle}>Sắp đến hạn</Text>
-            {upcoming.dueSoon.map((sub) => (
-              <View key={sub.subscriptionId} style={[styles.upcomingItem, styles.dueSoonItem]}>
-                <View style={styles.upcomingInfo}>
-                  <Text style={styles.upcomingName}>{sub.serviceName}</Text>
-                  <Text style={styles.dueSoonText}>
-                    Còn {sub.daysUntilDue} ngày
-                  </Text>
+          
+          {summary?.topSubscriptions?.length > 0 ? (
+            summary.topSubscriptions.slice(0, 5).map((sub, index) => (
+              <TouchableOpacity key={index} style={styles.subItem} activeOpacity={0.7}>
+                <ServiceIcon serviceName={sub.serviceName} size="md" />
+                <View style={styles.subInfo}>
+                  <Text style={styles.subName}>{sub.serviceName}</Text>
+                  <Text style={styles.subCycle}>{sub.cycle === 'MONTHLY' ? 'Hàng tháng' : sub.cycle === 'YEARLY' ? 'Hàng năm' : sub.cycle}</Text>
                 </View>
-                <Text style={styles.upcomingAmount}>
-                  {formatCurrency(sub.amount, sub.currency)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+                <Text style={styles.subAmount}>{formatCurrency(sub.amount, sub.currency)}</Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="card-outline" size={40} color={colors.slate[300]} />
+              <Text style={styles.emptyText}>Chưa có subscription nào</Text>
+            </View>
+          )}
+        </View>
 
-        {(!upcoming?.overdue?.length && !upcoming?.dueSoon?.length) && (
-          <Text style={styles.emptyText}>
-            Không có subscription nào sắp đến hạn
-          </Text>
-        )}
-      </View>
-    </ScrollView>
+        {/* Upcoming */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Sắp đến hạn</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Upcoming')}>
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          {upcoming?.overdue?.map((sub) => (
+            <View key={sub.subscriptionId} style={[styles.upcomingItem, styles.overdueItem]}>
+              <View style={styles.upcomingDot} />
+              <View style={styles.upcomingInfo}>
+                <Text style={styles.upcomingName}>{sub.serviceName}</Text>
+                <Text style={styles.overdueText}>Quá hạn {Math.abs(sub.daysUntilDue)} ngày</Text>
+              </View>
+              <Text style={styles.upcomingAmount}>{formatCurrency(sub.amount, sub.currency)}</Text>
+            </View>
+          ))}
+
+          {upcoming?.dueSoon?.slice(0, 3).map((sub) => (
+            <View key={sub.subscriptionId} style={[styles.upcomingItem, styles.dueSoonItem]}>
+              <View style={[styles.upcomingDot, { backgroundColor: colors.amber.main }]} />
+              <View style={styles.upcomingInfo}>
+                <Text style={styles.upcomingName}>{sub.serviceName}</Text>
+                <Text style={styles.dueSoonText}>Còn {sub.daysUntilDue} ngày</Text>
+              </View>
+              <Text style={styles.upcomingAmount}>{formatCurrency(sub.amount, sub.currency)}</Text>
+            </View>
+          ))}
+
+          {(!upcoming?.overdue?.length && !upcoming?.dueSoon?.length) && (
+            <View style={styles.emptyState}>
+              <Ionicons name="checkmark-circle" size={40} color={colors.emerald.main} />
+              <Text style={styles.emptyText}>Không có thanh toán sắp tới</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
+  container: { flex: 1, backgroundColor: colors.slate[50] },
+  loadingContainer: { flex: 1, padding: spacing.xl, paddingTop: 120 },
+  loadingCard: { height: 100, backgroundColor: colors.slate[200], borderRadius: borderRadius.lg, marginBottom: spacing.lg },
+  
+  header: { paddingTop: 50, paddingBottom: spacing['2xl'], paddingHorizontal: spacing.xl },
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  greeting: { ...typography.h3, color: colors.white },
+  userEmail: { ...typography.small, color: 'rgba(255,255,255,0.8)', marginTop: spacing.xs },
+  logoutBtn: { padding: spacing.sm, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: borderRadius.md },
+
+  content: { flex: 1, marginTop: -spacing.lg },
+  scrollContent: { paddingHorizontal: spacing.lg },
+
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -spacing.xs },
+  statCard: {
+    width: '50%',
+    padding: spacing.xs,
   },
-  loadingContainer: {
-    flex: 1,
+  statCardInner: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    ...shadows.sm,
+  },
+  statIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.sm,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  logoutButton: {
-    padding: 8,
-  },
-  summaryContainer: {
-    padding: 20,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  summaryCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  summaryNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 4,
-    textAlign: 'center',
-  },
+  statValue: { ...typography.h4, color: colors.slate[800], marginTop: spacing.xs },
+  statLabel: { ...typography.caption, color: colors.slate[500], marginTop: 2 },
+
   section: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    ...shadows.sm,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  subsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  subscriptionItem: {
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  sectionTitle: { ...typography.h4, color: colors.slate[800] },
+  seeAllText: { ...typography.smallBold, color: colors.primary[600] },
+
+  subItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.slate[100],
   },
-  subscriptionInfo: {
-    flex: 1,
-  },
-  subscriptionName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1e293b',
-  },
-  subscriptionCycle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  subscriptionAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
+  subInfo: { flex: 1, marginLeft: spacing.md },
+  subName: { ...typography.bodyBold, color: colors.slate[800] },
+  subCycle: { ...typography.caption, color: colors.slate[500], marginTop: 2 },
+  subAmount: { ...typography.bodyBold, color: colors.slate[800] },
+
   upcomingItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderLeftWidth: 4,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderLeftWidth: 3,
   },
-  overdueItem: {
-    backgroundColor: '#fef2f2',
-    borderLeftColor: '#ef4444',
-  },
-  dueSoonItem: {
-    backgroundColor: '#fffbeb',
-    borderLeftColor: '#f59e0b',
-  },
-  upcomingInfo: {
-    flex: 1,
-  },
-  upcomingName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1e293b',
-  },
-  overdueText: {
-    fontSize: 14,
-    color: '#ef4444',
-    marginTop: 2,
-  },
-  dueSoonText: {
-    fontSize: 14,
-    color: '#f59e0b',
-    marginTop: 2,
-  },
-  upcomingAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#64748b',
-    fontStyle: 'italic',
-    paddingVertical: 20,
-  },
+  overdueItem: { backgroundColor: colors.rose.light, borderLeftColor: colors.rose.main },
+  dueSoonItem: { backgroundColor: colors.amber.light, borderLeftColor: colors.amber.main },
+  upcomingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.rose.main, marginRight: spacing.md },
+  upcomingInfo: { flex: 1 },
+  upcomingName: { ...typography.bodyBold, color: colors.slate[800] },
+  overdueText: { ...typography.caption, color: colors.rose.dark, marginTop: 2 },
+  dueSoonText: { ...typography.caption, color: colors.amber.dark, marginTop: 2 },
+  upcomingAmount: { ...typography.bodyBold, color: colors.slate[800] },
+
+  emptyState: { alignItems: 'center', paddingVertical: spacing['2xl'] },
+  emptyText: { ...typography.small, color: colors.slate[400], marginTop: spacing.sm },
 });
+
+// Fix statCard to include inner styling
+const originalStatCard = styles.statCard;
+styles.statCard = {
+  ...originalStatCard,
+  backgroundColor: colors.white,
+  borderRadius: borderRadius.lg,
+  padding: spacing.md,
+  margin: spacing.xs,
+  width: '47%',
+  ...shadows.sm,
+};

@@ -6,248 +6,189 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
-  RefreshControl
+  RefreshControl,
+  StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import ServiceIcon from '../components/ServiceIcon';
+import { colors, gradients, shadows, spacing, borderRadius, typography } from '../theme';
 
 export default function SubscriptionsScreen({ navigation }) {
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchSubscriptions();
-  }, []);
+  useEffect(() => { fetchSubscriptions(); }, []);
 
   const fetchSubscriptions = async () => {
     try {
       const response = await axios.get('/api/v1/subscriptions');
-      if (response.data.success) {
-        setSubscriptions(response.data.data.subscriptions);
-      }
+      if (response.data.success) setSubscriptions(response.data.data.subscriptions);
     } catch (err) {
-      Alert.alert('Lỗi', 'Không thể tải danh sách subscription');
+      Alert.alert('Lỗi', 'Không thể tải danh sách');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchSubscriptions();
-  };
+  const onRefresh = () => { setRefreshing(true); fetchSubscriptions(); };
 
-  const formatCurrency = (amount, currency = 'VND') => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: currency
-    }).format(amount);
-  };
+  const formatCurrency = (amount, currency = 'VND') => 
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency }).format(amount);
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  };
+  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('vi-VN');
 
   const getCycleText = (cycle, cycleDays) => {
-    switch (cycle) {
-      case 'MONTHLY': return 'Hàng tháng';
-      case 'YEARLY': return 'Hàng năm';
-      case 'CUSTOM_DAYS': return `${cycleDays} ngày`;
-      default: return cycle;
-    }
+    const map = { MONTHLY: 'Hàng tháng', YEARLY: 'Hàng năm', DAILY: 'Hàng ngày' };
+    return map[cycle] || (cycle === 'CUSTOM_DAYS' ? `${cycleDays} ngày` : cycle);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'ACTIVE': return '#16a34a';
-      case 'PAUSED': return '#d97706';
-      case 'CANCELLED': return '#dc2626';
-      default: return '#64748b';
-    }
+  const getStatusConfig = (status) => {
+    const configs = {
+      ACTIVE: { color: colors.emerald.main, bg: colors.emerald.light, text: 'Hoạt động', icon: 'checkmark-circle' },
+      PAUSED: { color: colors.amber.main, bg: colors.amber.light, text: 'Tạm dừng', icon: 'pause-circle' },
+      CANCELLED: { color: colors.rose.main, bg: colors.rose.light, text: 'Đã hủy', icon: 'close-circle' },
+    };
+    return configs[status] || configs.ACTIVE;
   };
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'ACTIVE': return 'Hoạt động';
-      case 'PAUSED': return 'Tạm dừng';
-      case 'CANCELLED': return 'Đã hủy';
-      default: return status;
-    }
-  };
-
-  const handleStatusChange = async (subscriptionId, action) => {
-    try {
-      await axios.post(`/api/v1/subscriptions/${subscriptionId}/${action}`);
-      fetchSubscriptions();
-      Alert.alert('Thành công', `Đã ${action} subscription`);
-    } catch (err) {
-      Alert.alert('Lỗi', `Không thể ${action} subscription`);
-    }
-  };
-
-  const handleMoveNext = async (subscriptionId) => {
-    Alert.alert(
-      'Xác nhận',
-      'Chuyển sang kỳ thanh toán tiếp theo?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { 
-          text: 'Xác nhận', 
-          onPress: async () => {
-            try {
-              await axios.post(`/api/v1/subscriptions/${subscriptionId}/move-next`);
-              fetchSubscriptions();
-              Alert.alert('Thành công', 'Đã chuyển sang kỳ tiếp theo');
-            } catch (err) {
-              Alert.alert('Lỗi', 'Không thể chuyển sang kỳ tiếp theo');
-            }
-          }
+  const handleAction = async (id, action, confirmMsg) => {
+    Alert.alert('Xác nhận', confirmMsg, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xác nhận', onPress: async () => {
+        try {
+          await axios.post(`/api/v1/subscriptions/${id}/${action}`);
+          fetchSubscriptions();
+        } catch (err) {
+          Alert.alert('Lỗi', 'Thao tác thất bại');
         }
-      ]
-    );
+      }}
+    ]);
   };
 
-  const deleteSubscription = (subscriptionId) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      'Bạn có chắc muốn xóa subscription này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { 
-          text: 'Xóa', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await axios.delete(`/api/v1/subscriptions/${subscriptionId}`);
-              fetchSubscriptions();
-              Alert.alert('Thành công', 'Đã xóa subscription');
-            } catch (err) {
-              Alert.alert('Lỗi', 'Không thể xóa subscription');
-            }
-          }
+  const handleDelete = (id) => {
+    Alert.alert('Xóa subscription', 'Bạn có chắc muốn xóa?', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: async () => {
+        try {
+          await axios.delete(`/api/v1/subscriptions/${id}`);
+          fetchSubscriptions();
+        } catch (err) {
+          Alert.alert('Lỗi', 'Không thể xóa');
         }
-      ]
-    );
+      }}
+    ]);
   };
 
-  const renderSubscription = ({ item }) => (
-    <View style={styles.subscriptionCard}>
-      <View style={styles.subscriptionHeader}>
-        <View style={styles.subscriptionTitle}>
-          <Text style={styles.serviceName}>{item.serviceName}</Text>
-          {item.planName && (
-            <Text style={styles.planName}>({item.planName})</Text>
-          )}
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.subscriptionDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Số tiền:</Text>
-          <Text style={styles.detailValue}>
-            {formatCurrency(item.amountPerCycle, item.currency)}
-          </Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Chu kỳ:</Text>
-          <Text style={styles.detailValue}>
-            {getCycleText(item.cycle, item.cycleDays)}
-          </Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Ngày đến hạn:</Text>
-          <Text style={styles.detailValue}>
-            {formatDate(item.nextDueDate)}
-          </Text>
-        </View>
-
-        {item.notes && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Ghi chú:</Text>
-            <Text style={styles.detailValue}>{item.notes}</Text>
+  const renderItem = ({ item }) => {
+    const status = getStatusConfig(item.status);
+    
+    return (
+      <View style={styles.card}>
+        {/* Header */}
+        <View style={styles.cardHeader}>
+          <ServiceIcon serviceName={item.serviceName} size="lg" />
+          <View style={styles.cardInfo}>
+            <Text style={styles.serviceName}>{item.serviceName}</Text>
+            {item.planName && <Text style={styles.planName}>{item.planName}</Text>}
           </View>
-        )}
-      </View>
+          <View style={[styles.badge, { backgroundColor: status.bg }]}>
+            <Ionicons name={status.icon} size={12} color={status.color} />
+            <Text style={[styles.badgeText, { color: status.color }]}>{status.text}</Text>
+          </View>
+        </View>
 
-      <View style={styles.actionButtons}>
-        {item.status === 'ACTIVE' && (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.moveNextButton]}
-              onPress={() => handleMoveNext(item.subscriptionId)}
+        {/* Amount */}
+        <View style={styles.amountRow}>
+          <Text style={styles.amount}>{formatCurrency(item.amountPerCycle, item.currency)}</Text>
+          <Text style={styles.cycle}>{getCycleText(item.cycle, item.cycleDays)}</Text>
+        </View>
+
+        {/* Details */}
+        <View style={styles.details}>
+          <View style={styles.detailItem}>
+            <Ionicons name="calendar-outline" size={14} color={colors.slate[400]} />
+            <Text style={styles.detailText}>Thanh toán: {formatDate(item.nextDueDate)}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="notifications-outline" size={14} color={colors.slate[400]} />
+            <Text style={styles.detailText}>Nhắc trước {item.reminderDays} ngày</Text>
+          </View>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          {item.status === 'ACTIVE' && (
+            <>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: colors.emerald.light }]}
+                onPress={() => handleAction(item.subscriptionId, 'move-next', 'Đánh dấu đã thanh toán?')}
+              >
+                <Ionicons name="checkmark" size={18} color={colors.emerald.main} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: colors.amber.light }]}
+                onPress={() => handleAction(item.subscriptionId, 'pause', 'Tạm dừng subscription?')}
+              >
+                <Ionicons name="pause" size={18} color={colors.amber.main} />
+              </TouchableOpacity>
+            </>
+          )}
+          {item.status === 'PAUSED' && (
+            <TouchableOpacity 
+              style={[styles.actionBtn, { backgroundColor: colors.emerald.light }]}
+              onPress={() => handleAction(item.subscriptionId, 'resume', 'Tiếp tục subscription?')}
             >
-              <Ionicons name="play-forward-outline" size={16} color="#fff" />
-              <Text style={styles.actionButtonText}>Đã thanh toán</Text>
+              <Ionicons name="play" size={18} color={colors.emerald.main} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pauseButton]}
-              onPress={() => handleStatusChange(item.subscriptionId, 'pause')}
-            >
-              <Ionicons name="pause-outline" size={16} color="#fff" />
-            </TouchableOpacity>
-          </>
-        )}
-
-        {item.status === 'PAUSED' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.resumeButton]}
-            onPress={() => handleStatusChange(item.subscriptionId, 'resume')}
+          )}
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: colors.rose.light }]}
+            onPress={() => handleDelete(item.subscriptionId)}
           >
-            <Ionicons name="play-outline" size={16} color="#fff" />
-            <Text style={styles.actionButtonText}>Tiếp tục</Text>
+            <Ionicons name="trash-outline" size={18} color={colors.rose.main} />
           </TouchableOpacity>
-        )}
-
-        {item.status !== 'CANCELLED' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
-            onPress={() => handleStatusChange(item.subscriptionId, 'cancel')}
-          >
-            <Ionicons name="close-outline" size={16} color="#fff" />
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => deleteSubscription(item.subscriptionId)}
-        >
-          <Ionicons name="trash-outline" size={16} color="#fff" />
-        </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* Add Button */}
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate('AddSubscription')}
-      >
-        <Ionicons name="add" size={24} color="#fff" />
-        <Text style={styles.addButtonText}>Thêm subscription</Text>
-      </TouchableOpacity>
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Subscriptions</Text>
+          <Text style={styles.subtitle}>{subscriptions.length} dịch vụ đang theo dõi</Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('AddSubscription')} activeOpacity={0.8}>
+          <LinearGradient colors={gradients.primary} style={styles.addBtn}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
 
-      {/* Subscriptions List */}
       <FlatList
         data={subscriptions}
-        renderItem={renderSubscription}
+        renderItem={renderItem}
         keyExtractor={(item) => item.subscriptionId}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={styles.listContainer}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[500]} />}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="card-outline" size={64} color="#cbd5e1" />
+          <View style={styles.empty}>
+            <Ionicons name="card-outline" size={64} color={colors.slate[300]} />
             <Text style={styles.emptyText}>Chưa có subscription nào</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('AddSubscription')}>
+              <LinearGradient colors={gradients.primary} style={styles.emptyBtn}>
+                <Text style={styles.emptyBtnText}>Thêm mới</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -255,140 +196,92 @@ export default function SubscriptionsScreen({ navigation }) {
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  addButton: {
+  container: { flex: 1, backgroundColor: colors.slate[50] },
+  
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing['3xl'],
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.white,
+    ...shadows.sm,
+  },
+  title: { ...typography.h2, color: colors.slate[800] },
+  subtitle: { ...typography.small, color: colors.slate[500], marginTop: spacing.xs },
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
-    margin: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  subscriptionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  subscriptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  subscriptionTitle: {
-    flex: 1,
-  },
-  serviceName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  planName: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  subscriptionDetails: {
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    ...shadows.md,
   },
-  detailLabel: {
-    fontSize: 14,
-    color: '#64748b',
-    flex: 1,
+
+  list: { padding: spacing.lg, paddingBottom: 100 },
+
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.sm,
   },
-  detailValue: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '500',
-    flex: 2,
-    textAlign: 'right',
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  cardInfo: { flex: 1, marginLeft: spacing.md },
+  serviceName: { ...typography.bodyBold, color: colors.slate[800] },
+  planName: { ...typography.caption, color: colors.slate[500], marginTop: 2 },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    gap: 4,
   },
-  actionButtons: {
+  badgeText: { ...typography.captionBold },
+
+  amountRow: { marginBottom: spacing.md },
+  amount: { ...typography.h3, color: colors.slate[800] },
+  cycle: { ...typography.small, color: colors.slate[500], marginTop: 2 },
+
+  details: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.slate[100],
+  },
+  detailItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  detailText: { ...typography.caption, color: colors.slate[500] },
+
+  actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.slate[100],
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 8,
-    marginBottom: 4,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  moveNextButton: {
-    backgroundColor: '#16a34a',
-  },
-  pauseButton: {
-    backgroundColor: '#d97706',
-  },
-  resumeButton: {
-    backgroundColor: '#16a34a',
-  },
-  cancelButton: {
-    backgroundColor: '#dc2626',
-  },
-  deleteButton: {
-    backgroundColor: '#ef4444',
-  },
-  emptyContainer: {
-    alignItems: 'center',
+  actionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
-    paddingVertical: 64,
+    alignItems: 'center',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#64748b',
-    marginTop: 16,
-    textAlign: 'center',
+
+  empty: { alignItems: 'center', paddingVertical: spacing['3xl'] * 2 },
+  emptyText: { ...typography.body, color: colors.slate[400], marginTop: spacing.lg, marginBottom: spacing.xl },
+  emptyBtn: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
   },
+  emptyBtnText: { ...typography.bodyBold, color: colors.white },
 });
